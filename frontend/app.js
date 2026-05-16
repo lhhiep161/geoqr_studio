@@ -51,6 +51,7 @@ const mapsQrInputEl = document.getElementById("mapsQrInput");
 const mapsQrBtnEl = document.getElementById("mapsQrBtn");
 const mapsQrStatusTextEl = document.getElementById("mapsQrStatusText");
 const mapsQrResultCardEl = document.getElementById("mapsQrResultCard");
+const mapsQrSourceEl = document.getElementById("mapsQrSource");
 const mapsQrLatEl = document.getElementById("mapsQrLat");
 const mapsQrLngEl = document.getElementById("mapsQrLng");
 const mapsQrLinkEl = document.getElementById("mapsQrLink");
@@ -79,6 +80,15 @@ const brandFallbackEl = document.getElementById("brandFallback");
 
 const state = { lastLatitude: null, lastLongitude: null, lastMapsUrl: "", multiRows: [] };
 const mapsQrState = { link: "", qrDataUrl: "" };
+
+function toVietnameseCoordinateSource(source) {
+  if (source === "plus_code") return "Plus Code";
+  if (source === "google_place_data") return "Link Google Maps (điểm địa điểm)";
+  if (source === "query_param") return "Link Google Maps (tham số truy vấn)";
+  if (source === "viewport_center_fallback") return "Tâm màn hình (fallback)";
+  if (source === "plain_text") return "Lat/Long nhập trực tiếp";
+  return source || "-";
+}
 
 brandLogoEl.addEventListener("error", () => {
   brandLogoEl.style.display = "none";
@@ -531,6 +541,7 @@ async function createMapsQr() {
 
     mapsQrLatEl.textContent = Number(data.latitude).toFixed(12);
     mapsQrLngEl.textContent = Number(data.longitude).toFixed(12);
+    mapsQrSourceEl.textContent = toVietnameseCoordinateSource(data.coordinate_source);
     mapsQrLinkEl.href = data.google_maps_url || "#";
     mapsQrLinkEl.textContent = data.google_maps_url || "-";
     mapsQrState.link = data.google_maps_url || "";

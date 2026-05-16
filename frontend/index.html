@@ -127,6 +127,7 @@
       <section id="mapsQrCard" class="card">
         <h2 class="section-title">Tạo QR từ Google Maps</h2>
         <p class="section-helper">Dán link Google Maps hoặc tọa độ Lat/Long có sẵn để tạo mã QR vị trí.</p>
+        <p class="manual-note">Có thể dán Lat/Long, link Google Maps, link rút gọn hoặc Plus Code.</p>
         <label class="field-label" for="mapsQrInput">Link Google Maps hoặc tọa độ Lat/Long</label>
         <textarea
           id="mapsQrInput"
@@ -138,6 +139,7 @@
         <p id="mapsQrStatusText" class="status-text"></p>
 
         <section id="mapsQrResultCard" class="result-card hidden">
+          <div class="result-row"><span>Nguồn tọa độ</span><strong id="mapsQrSource">-</strong></div>
           <div class="result-row"><span>Latitude</span><strong id="mapsQrLat">-</strong></div>
           <div class="result-row"><span>Longitude</span><strong id="mapsQrLng">-</strong></div>
           <div class="result-row"><span>Google Maps</span><a id="mapsQrLink" href="#" target="_blank" rel="noopener">Mở liên kết</a></div>

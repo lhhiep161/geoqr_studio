@@ -15,10 +15,12 @@ from backend.core.distance_calculator import haversine_distance_meters
 from backend.core.google_maps_resolver import resolve_google_maps_short_link, validate_google_maps_url
 from backend.core.google_maps_url import build_google_maps_url
 from backend.core.maps_parser import (
+    SOURCE_VIEWPORT_FALLBACK,
     is_google_maps_short_link,
-    parse_lat_lng_from_google_maps_url,
-    parse_lat_lng_from_text,
+    parse_lat_lng_from_google_maps_url_with_source,
+    parse_lat_lng_with_source,
 )
+from backend.core.plus_code_parser import parse_plus_code
 from backend.core.vn2000_config import VN2000ConfigError, VN2000ConfigLoader
 from backend.services.ocr_service import (
     OCRError,
@@ -118,6 +120,7 @@ class GoogleMapsQRSuccessResponse(BaseModel):
     ok: bool = True
     latitude: float
     longitude: float
+    coordinate_source: str
     google_maps_url: str
     source_url: Optional[str]
     resolved_url: Optional[str]
@@ -328,7 +331,10 @@ def create_google_maps_qr(payload: GoogleMapsQRRequest):
 
     try:
         parsed = None
-        if value.startswith(("http://", "https://")):
+        plus_code_result = parse_plus_code(value)
+        if plus_code_result is not None:
+            parsed = (plus_code_result.latitude, plus_code_result.longitude, plus_code_result.source)
+        if parsed is None and value.startswith(("http://", "https://")):
             validate_google_maps_url(value)
             source_url = value
             short_link = is_google_maps_short_link(value)
@@ -337,7 +343,7 @@ def create_google_maps_qr(payload: GoogleMapsQRRequest):
             else:
                 resolved_url = value
             validate_google_maps_url(resolved_url)
-            parsed = parse_lat_lng_from_google_maps_url(resolved_url)
+            parsed = parse_lat_lng_from_google_maps_url_with_source(resolved_url)
             if parsed is None and short_link:
                 return JSONResponse(
                     status_code=400,
@@ -347,8 +353,8 @@ def create_google_maps_qr(payload: GoogleMapsQRRequest):
                         suggestion="Mở link rút gọn trên Google Maps, sau đó sao chép link đầy đủ hoặc Lat/Long.",
                     ).model_dump(),
                 )
-        else:
-            parsed = parse_lat_lng_from_text(value)
+        elif parsed is None:
+            parsed = parse_lat_lng_with_source(value)
 
         if parsed is None:
             return JSONResponse(
@@ -360,7 +366,7 @@ def create_google_maps_qr(payload: GoogleMapsQRRequest):
                 ).model_dump(),
             )
 
-        latitude, longitude = parsed
+        latitude, longitude, coordinate_source = parsed
         if not (-90.0 <= latitude <= 90.0 and -180.0 <= longitude <= 180.0):
             return JSONResponse(
                 status_code=400,
@@ -373,6 +379,8 @@ def create_google_maps_qr(payload: GoogleMapsQRRequest):
 
         if not (8.0 <= latitude <= 24.0 and 102.0 <= longitude <= 110.0):
             warnings.append("Tọa độ không nằm trong phạm vi Việt Nam, vui lòng kiểm tra lại.")
+        if coordinate_source == SOURCE_VIEWPORT_FALLBACK:
+            warnings.append("Link Google Maps chỉ có tọa độ tâm màn hình, có thể không phải vị trí chính xác của địa điểm.")
 
         maps_url = build_google_maps_url(latitude, longitude)
         qr_png_base64 = build_qr_png_base64(maps_url)
@@ -380,6 +388,7 @@ def create_google_maps_qr(payload: GoogleMapsQRRequest):
             ok=True,
             latitude=latitude,
             longitude=longitude,
+            coordinate_source=coordinate_source,
             google_maps_url=maps_url,
             source_url=source_url,
             resolved_url=resolved_url,
