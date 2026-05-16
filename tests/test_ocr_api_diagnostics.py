@@ -41,3 +41,29 @@ def test_ocr_coordinates_rejects_empty_image() -> None:
     assert data["stage"] == "upload_read"
     assert data["error_code"] == "UPLOAD_EMPTY"
 
+
+def test_ocr_coordinates_accepts_mode_fast_with_non_image_error_shape() -> None:
+    files = {"image": ("note.txt", b"hello", "text/plain")}
+    response = client.post("/api/ocr-coordinates?mode=fast", files=files)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["ok"] is False
+    assert data["error_code"] == "UPLOAD_NOT_IMAGE"
+
+
+def test_ocr_coordinates_accepts_mode_enhanced_with_non_image_error_shape() -> None:
+    files = {"image": ("note.txt", b"hello", "text/plain")}
+    response = client.post("/api/ocr-coordinates?mode=enhanced", files=files)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["ok"] is False
+    assert data["error_code"] == "UPLOAD_NOT_IMAGE"
+
+
+def test_ocr_coordinates_invalid_mode_falls_back_and_still_handles_non_image() -> None:
+    files = {"image": ("note.txt", b"hello", "text/plain")}
+    response = client.post("/api/ocr-coordinates?mode=unknown_mode", files=files)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["ok"] is False
+    assert data["error_code"] == "UPLOAD_NOT_IMAGE"

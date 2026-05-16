@@ -39,14 +39,6 @@
         <section class="hidden">
           <button id="gpsBtn" class="gps-btn" type="button">Lấy vị trí hiện tại</button>
           <p id="gpsStatusText" class="gps-status-text">Chưa lấy vị trí GPS.</p>
-          <section class="manual-location">
-            <h3 class="subsection-title">Vị trí hiện tại để đối chiếu</h3>
-            <p class="manual-note">Nếu GPS không hoạt động, hãy dán Lat/Long hoặc link Google Maps làm dữ liệu thay thế.</p>
-            <label class="field-label" for="manualLocationInput">Dán Lat/Long hoặc link Google Maps vị trí hiện tại</label>
-            <input id="manualLocationInput" class="field-input" type="text" />
-            <button id="parseLocationBtn" class="secondary-btn" type="button">Đọc vị trí từ nội dung đã dán</button>
-            <p id="manualParseStatusText" class="manual-status-text"></p>
-          </section>
         </section>
 
         <button id="convertBtn" class="convert-btn" type="button">Chuyển đổi</button>
@@ -65,7 +57,14 @@
         </div>
         <p id="ocrFileNameText" class="manual-status-text">Chưa chọn ảnh.</p>
 
-        <button id="ocrBtn" class="secondary-btn" type="button">OCR tọa độ</button>
+        <div class="ocr-actions">
+          <button id="ocrFastBtn" class="convert-btn" type="button">Đọc nhanh tọa độ</button>
+          <button id="ocrEnhancedBtn" class="secondary-btn" type="button">Đọc kỹ tọa độ</button>
+        </div>
+        <p class="manual-note">Đọc nhanh: Phù hợp ảnh rõ, crop sát vùng bảng tọa độ.</p>
+        <p class="manual-note">Đọc kỹ: Dùng khi ảnh mờ/nhiễu/vân nền; có thể mất nhiều thời gian hơn.</p>
+        <p id="ocrEnhancedNote" class="manual-note hidden">Chế độ đọc kỹ có thể mất nhiều thời gian hơn, đặc biệt trên bản web thử nghiệm.</p>
+
         <p id="ocrStatusText" class="manual-status-text"></p>
         <ul id="ocrWarnings" class="ocr-warnings"></ul>
 

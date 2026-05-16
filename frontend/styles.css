@@ -298,6 +298,10 @@ body {
   margin-top: 8px;
 }
 
+.ocr-actions .convert-btn {
+  margin-top: 0;
+}
+
 .ocr-raw {
   margin-top: 10px;
 }

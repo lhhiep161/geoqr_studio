@@ -1,17 +1,13 @@
 function resolveApiBaseUrl() {
   const explicitBase = window.APP_CONFIG?.API_BASE_URL;
-  if (typeof explicitBase === "string" && explicitBase.trim() !== "") {
-    return explicitBase.trim().replace(/\/+$/, "");
-  }
-  const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-  return isLocalhost ? "http://localhost:8000" : "";
+  if (typeof explicitBase === "string" && explicitBase.trim() !== "") return explicitBase.trim().replace(/\/+$/, "");
+  return ["localhost", "127.0.0.1"].includes(window.location.hostname) ? "http://localhost:8000" : "";
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
 const API_URLS = {
   provinces: `${API_BASE_URL}/api/provinces`,
   convert: `${API_BASE_URL}/api/convert`,
-  ocrStatus: `${API_BASE_URL}/api/ocr-status`,
   ocrCoordinates: `${API_BASE_URL}/api/ocr-coordinates`,
 };
 
@@ -29,7 +25,9 @@ const pickFileBtnEl = document.getElementById("pickFileBtn");
 const ocrImageInputEl = document.getElementById("ocrImageInput");
 const ocrImageCaptureInputEl = document.getElementById("ocrImageCaptureInput");
 const ocrFileNameTextEl = document.getElementById("ocrFileNameText");
-const ocrBtnEl = document.getElementById("ocrBtn");
+const ocrFastBtnEl = document.getElementById("ocrFastBtn");
+const ocrEnhancedBtnEl = document.getElementById("ocrEnhancedBtn");
+const ocrEnhancedNoteEl = document.getElementById("ocrEnhancedNote");
 const ocrStatusTextEl = document.getElementById("ocrStatusText");
 const ocrWarningsEl = document.getElementById("ocrWarnings");
 const ocrCandidatesTableWrapEl = document.getElementById("ocrCandidatesTableWrap");
@@ -62,12 +60,7 @@ const openMapsBtnEl = document.getElementById("openMapsBtn");
 const brandLogoEl = document.getElementById("brandLogo");
 const brandFallbackEl = document.getElementById("brandFallback");
 
-const state = {
-  lastLatitude: null,
-  lastLongitude: null,
-  lastMapsUrl: "",
-  multiRows: [],
-};
+const state = { lastLatitude: null, lastLongitude: null, lastMapsUrl: "", multiRows: [] };
 
 brandLogoEl.addEventListener("error", () => {
   brandLogoEl.style.display = "none";
@@ -86,13 +79,6 @@ function translateWarningText(warning) {
   if (value === "Input order auto-detected as northing/easting (value1/value2 may be swapped).") {
     return "Hệ thống tự nhận diện thứ tự tọa độ là Bắc/Đông. Vui lòng kiểm tra lại giá trị 1 và giá trị 2.";
   }
-  if (value === "Input order auto-detected as easting/northing.") return "Hệ thống tự nhận diện thứ tự tọa độ là Đông/Bắc.";
-  if (value === "Both coordinate orders produce plausible Vietnam positions; defaulted to easting/northing.") {
-    return "Cả hai thứ tự tọa độ đều cho kết quả hợp lý trong phạm vi Việt Nam; hệ thống tạm chọn thứ tự Đông/Bắc.";
-  }
-  if (value === "Neither coordinate order looks plausible in Vietnam bbox. Review coordinate values and province.") {
-    return "Không có thứ tự tọa độ nào cho kết quả hợp lý trong phạm vi Việt Nam. Vui lòng kiểm tra lại giá trị tọa độ và tỉnh/thành phố.";
-  }
   return value;
 }
 
@@ -109,9 +95,19 @@ function setLoading(isLoading) {
   convertBtnEl.textContent = isLoading ? "Đang chuyển đổi..." : "Chuyển đổi";
 }
 
-function setOcrLoading(isLoading) {
-  ocrBtnEl.disabled = isLoading;
-  ocrBtnEl.textContent = isLoading ? "Đang OCR..." : "OCR tọa độ";
+function setOcrLoading(isLoading, mode = "fast") {
+  ocrFastBtnEl.disabled = isLoading;
+  ocrEnhancedBtnEl.disabled = isLoading;
+  if (!isLoading) {
+    ocrFastBtnEl.textContent = "Đọc nhanh tọa độ";
+    ocrEnhancedBtnEl.textContent = "Đọc kỹ tọa độ";
+    return;
+  }
+  if (mode === "enhanced") {
+    ocrEnhancedBtnEl.textContent = "Đang đọc kỹ tọa độ, vui lòng chờ...";
+  } else {
+    ocrFastBtnEl.textContent = "Đang đọc nhanh tọa độ...";
+  }
 }
 
 function setMultiConvertLoading(isLoading) {
@@ -152,9 +148,7 @@ function renderOcrWarnings(warnings) {
   ocrWarningsEl.innerHTML = "";
   (warnings || []).forEach((warning) => {
     const li = document.createElement("li");
-    li.textContent = warning === "OCR is experimental. Please verify values before conversion."
-      ? "OCR đang trong giai đoạn thử nghiệm. Vui lòng kiểm tra kỹ kết quả trước khi chuyển đổi."
-      : warning;
+    li.textContent = warning;
     ocrWarningsEl.appendChild(li);
   });
 }
@@ -162,9 +156,7 @@ function renderOcrWarnings(warnings) {
 function mapOcrErrorMessage(payload) {
   if (!payload || payload.ok !== false) return null;
   if (payload.stage === "image_open") return "Không đọc được file ảnh. Hãy dùng JPG/PNG rõ nét và thử lại.";
-  if (payload.error_code === "TESSERACT_UNAVAILABLE" || payload.stage === "tesseract_run") {
-    return "Chưa cấu hình được Tesseract OCR. Kiểm tra TESSERACT_CMD/PATH.";
-  }
+  if (payload.error_code === "TESSERACT_UNAVAILABLE" || payload.stage === "tesseract_run") return "Chưa cấu hình được Tesseract OCR. Kiểm tra TESSERACT_CMD/PATH.";
   return payload.message || "OCR thất bại.";
 }
 
@@ -188,9 +180,7 @@ function getSelectedOcrCandidates() {
     const label = checkbox.dataset.label || "-";
     const value1 = readRowValue(v1Input);
     const value2 = readRowValue(v2Input);
-    if (Number.isFinite(value1) && Number.isFinite(value2)) {
-      selected.push({ point_label: label, value1, value2 });
-    }
+    if (Number.isFinite(value1) && Number.isFinite(value2)) selected.push({ point_label: label, value1, value2 });
   });
   const uniq = new Map();
   selected.forEach((item) => {
@@ -201,10 +191,7 @@ function getSelectedOcrCandidates() {
 }
 
 async function copyText(text, successMessage) {
-  if (!text) {
-    statusTextEl.textContent = "Không có dữ liệu để sao chép.";
-    return;
-  }
+  if (!text) return void (statusTextEl.textContent = "Không có dữ liệu để sao chép.");
   try {
     await navigator.clipboard.writeText(text);
     statusTextEl.textContent = successMessage;
@@ -237,6 +224,9 @@ function buildOcrMetaDetails(payload) {
     li.textContent = text;
     ocrMetaListEl.appendChild(li);
   };
+  addItem(`Chế độ OCR: ${payload.ocr_mode || "-"}`);
+  addItem(`Thời gian xử lý: ${payload.elapsed_seconds ?? "-"} giây`);
+  addItem(`Số cặp tọa độ nhận diện: ${payload.candidate_count ?? 0}`);
   if (payload.preprocessing_method) addItem(`Phương pháp tiền xử lý: ${payload.preprocessing_method}`);
   if (payload.ocr_config) addItem(`Cấu hình OCR: ${payload.ocr_config}`);
   if (payload.ocr_language) addItem(`Ngôn ngữ OCR: ${payload.ocr_language}`);
@@ -255,33 +245,25 @@ function renderOcrCandidates(candidates) {
   ocrBatchPreviewEl.innerHTML = "";
   multiResultCardEl.classList.add("hidden");
   state.multiRows = [];
-
   if (!candidates || candidates.length === 0) {
     ocrCandidatesTableWrapEl.classList.add("hidden");
     return;
   }
-
   const hasRowBased = candidates.some((c) => !String(c.confidence_note || "").toLowerCase().includes("nearby ocr numbers"));
   const list = hasRowBased ? candidates.filter((c) => !String(c.confidence_note || "").toLowerCase().includes("nearby ocr numbers")) : candidates;
-  if (list.length === 0) {
-    ocrCandidatesTableWrapEl.classList.add("hidden");
-    return;
-  }
-
+  if (list.length === 0) return void ocrCandidatesTableWrapEl.classList.add("hidden");
   ocrCandidatesTableWrapEl.classList.remove("hidden");
+
   list.forEach((item) => {
     const tr = document.createElement("tr");
-
     const tdSelect = document.createElement("td");
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.className = "ocr-select";
     checkbox.dataset.label = item.point_label || "";
     tdSelect.appendChild(checkbox);
-
     const tdLabel = document.createElement("td");
     tdLabel.textContent = item.point_label || "-";
-
     const tdV1 = document.createElement("td");
     const inputV1 = document.createElement("input");
     inputV1.type = "number";
@@ -291,7 +273,6 @@ function renderOcrCandidates(candidates) {
     inputV1.addEventListener("input", () => updateValueInputStyle(inputV1));
     updateValueInputStyle(inputV1);
     tdV1.appendChild(inputV1);
-
     const tdV2 = document.createElement("td");
     const inputV2 = document.createElement("input");
     inputV2.type = "number";
@@ -301,7 +282,6 @@ function renderOcrCandidates(candidates) {
     inputV2.addEventListener("input", () => updateValueInputStyle(inputV2));
     updateValueInputStyle(inputV2);
     tdV2.appendChild(inputV2);
-
     const tdAction = document.createElement("td");
     const btn = document.createElement("button");
     btn.className = "secondary-btn";
@@ -310,16 +290,12 @@ function renderOcrCandidates(candidates) {
     btn.addEventListener("click", () => {
       const value1 = readRowValue(inputV1);
       const value2 = readRowValue(inputV2);
-      if (!Number.isFinite(value1) || !Number.isFinite(value2)) {
-        statusTextEl.textContent = "Giá trị OCR không hợp lệ. Vui lòng chỉnh lại trước khi dùng.";
-        return;
-      }
+      if (!Number.isFinite(value1) || !Number.isFinite(value2)) return void (statusTextEl.textContent = "Giá trị OCR không hợp lệ. Vui lòng chỉnh lại trước khi dùng.");
       value1El.value = String(value1);
       value2El.value = String(value2);
       statusTextEl.textContent = "Đã điền tọa độ từ OCR. Vui lòng kiểm tra và bấm Chuyển đổi.";
     });
     tdAction.appendChild(btn);
-
     tr.append(tdSelect, tdLabel, tdV1, tdV2, tdAction);
     ocrCandidatesTableBodyEl.appendChild(tr);
   });
@@ -369,9 +345,7 @@ function renderMultiResultTable(rows) {
     tr.append(...cells);
     multiResultTableBodyEl.appendChild(tr);
   });
-  multiResultStatusTextEl.textContent = warningLines.length > 0
-    ? `Có ${warningLines.length} điểm chuyển đổi thất bại. ${warningLines.join(" | ")}`
-    : "Đã chuyển đổi thành công các điểm đã chọn.";
+  multiResultStatusTextEl.textContent = warningLines.length > 0 ? `Có ${warningLines.length} điểm chuyển đổi thất bại. ${warningLines.join(" | ")}` : "Đã chuyển đổi thành công các điểm đã chọn.";
 }
 
 async function loadProvinces() {
@@ -397,12 +371,9 @@ async function loadProvinces() {
   }
 }
 
-async function runOcr() {
+async function runOcr(mode) {
   const file = (ocrImageInputEl.files && ocrImageInputEl.files[0]) || (ocrImageCaptureInputEl.files && ocrImageCaptureInputEl.files[0]);
-  if (!file) {
-    setOcrStatus("Vui lòng chọn ảnh trước khi OCR.", "error");
-    return;
-  }
+  if (!file) return void setOcrStatus("Vui lòng chọn ảnh trước khi OCR.", "error");
 
   setOcrStatus("");
   renderOcrWarnings([]);
@@ -413,16 +384,18 @@ async function runOcr() {
   ocrMetaDetailsEl.classList.add("hidden");
   ocrRawDetailsEl.classList.add("hidden");
   multiResultCardEl.classList.add("hidden");
-  setOcrLoading(true);
+  ocrEnhancedNoteEl.classList.toggle("hidden", mode !== "enhanced");
+  setOcrLoading(true, mode);
 
   try {
     const form = new FormData();
     form.append("image", file);
+    const url = `${API_URLS.ocrCoordinates}?mode=${encodeURIComponent(mode)}`;
     console.log("[OCR] API_BASE_URL =", API_BASE_URL);
-    console.log("[OCR] OCR upload URL =", API_URLS.ocrCoordinates);
+    console.log("[OCR] OCR upload URL =", url);
     console.log("[OCR] file =", { name: file.name, size: file.size, type: file.type });
 
-    const resp = await fetch(API_URLS.ocrCoordinates, { method: "POST", body: form });
+    const resp = await fetch(url, { method: "POST", body: form });
     const rawBody = await resp.text();
     let data = {};
     try {
@@ -430,7 +403,6 @@ async function runOcr() {
     } catch (_err) {
       data = { message: rawBody || "Empty response body." };
     }
-
     if (!resp.ok || data?.ok === false) {
       const friendly = mapOcrErrorMessage(data);
       const stage = data?.stage ? ` [giai đoạn: ${data.stage}]` : "";
@@ -442,7 +414,7 @@ async function runOcr() {
     }
 
     setOcrStatus("OCR hoàn tất. Hãy xác minh kết quả trước khi dùng.", "success");
-    renderOcrWarnings(data.warnings || []);
+    renderOcrWarnings((data.warnings || []).map((w) => translateWarningText(w)));
     renderOcrCandidates(data.candidates || []);
     buildOcrMetaDetails(data);
     ocrRawTextEl.textContent = data.raw_text || "";
@@ -461,11 +433,7 @@ async function convertCoordinates() {
   const value2 = Number(value2El.value);
   const inputMode = inputModeEl.value;
   if (!province) return void (statusTextEl.textContent = "Vui lòng chọn tỉnh/thành phố.");
-  if (!Number.isFinite(value1) || !Number.isFinite(value2)) {
-    statusTextEl.textContent = "Vui lòng nhập đầy đủ 2 giá trị tọa độ hợp lệ.";
-    return;
-  }
-
+  if (!Number.isFinite(value1) || !Number.isFinite(value2)) return void (statusTextEl.textContent = "Vui lòng nhập đầy đủ 2 giá trị tọa độ hợp lệ.");
   setLoading(true);
   statusTextEl.textContent = "";
   try {
@@ -476,7 +444,6 @@ async function convertCoordinates() {
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data?.detail || "Chuyển đổi thất bại.");
-
     state.lastLatitude = Number(data.latitude);
     state.lastLongitude = Number(data.longitude);
     state.lastMapsUrl = data.google_maps_url || "";
@@ -488,7 +455,9 @@ async function convertCoordinates() {
     if (data.qr_png_base64) {
       resultQrEl.src = `data:image/png;base64,${data.qr_png_base64}`;
       qrBoxEl.classList.remove("hidden");
-    } else qrBoxEl.classList.add("hidden");
+    } else {
+      qrBoxEl.classList.add("hidden");
+    }
     renderWarnings(data.warnings || []);
     resultCardEl.classList.remove("hidden");
     resultCardEl.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -502,42 +471,30 @@ async function convertCoordinates() {
 
 async function convertSelectedCandidates() {
   const province = provinceEl.value.trim();
-  if (!province) {
-    statusTextEl.textContent = "Vui lòng chọn tỉnh/thành phố trước khi chuyển đổi nhiều điểm.";
-    return;
-  }
+  if (!province) return void (statusTextEl.textContent = "Vui lòng chọn tỉnh/thành phố trước khi chuyển đổi nhiều điểm.");
   const selected = getSelectedOcrCandidates();
   if (selected.length === 0) {
     multiResultStatusTextEl.textContent = "Vui lòng chọn ít nhất 1 điểm OCR hợp lệ.";
     multiResultCardEl.classList.remove("hidden");
     return;
   }
-
   setMultiConvertLoading(true);
   multiResultStatusTextEl.textContent = "";
   try {
-    const rows = await Promise.all(
-      selected.map(async (item) => {
-        try {
-          const resp = await fetch(API_URLS.convert, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ province, value1: item.value1, value2: item.value2, input_mode: "auto", current_lat: null, current_lng: null }),
-          });
-          const data = await resp.json();
-          if (!resp.ok) return { ...item, ok: false, error_message: data?.detail || "Chuyển đổi thất bại." };
-          return {
-            ...item,
-            ok: true,
-            latitude: Number(data.latitude),
-            longitude: Number(data.longitude),
-            google_maps_url: data.google_maps_url || `https://www.google.com/maps?q=${data.latitude},${data.longitude}`,
-          };
-        } catch (err) {
-          return { ...item, ok: false, error_message: err.message || "Lỗi kết nối." };
-        }
-      })
-    );
+    const rows = await Promise.all(selected.map(async (item) => {
+      try {
+        const resp = await fetch(API_URLS.convert, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ province, value1: item.value1, value2: item.value2, input_mode: "auto", current_lat: null, current_lng: null }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) return { ...item, ok: false, error_message: data?.detail || "Chuyển đổi thất bại." };
+        return { ...item, ok: true, latitude: Number(data.latitude), longitude: Number(data.longitude), google_maps_url: data.google_maps_url || `https://www.google.com/maps?q=${data.latitude},${data.longitude}` };
+      } catch (err) {
+        return { ...item, ok: false, error_message: err.message || "Lỗi kết nối." };
+      }
+    }));
     state.multiRows = rows;
     renderMultiResultTable(rows);
     multiResultCardEl.classList.remove("hidden");
@@ -552,7 +509,8 @@ pickFileBtnEl.addEventListener("click", () => ocrImageInputEl.click());
 ocrImageCaptureInputEl.addEventListener("change", () => setSelectedFile(ocrImageCaptureInputEl.files?.[0] || null));
 ocrImageInputEl.addEventListener("change", () => setSelectedFile(ocrImageInputEl.files?.[0] || null));
 convertBtnEl.addEventListener("click", convertCoordinates);
-ocrBtnEl.addEventListener("click", runOcr);
+ocrFastBtnEl.addEventListener("click", () => runOcr("fast"));
+ocrEnhancedBtnEl.addEventListener("click", () => runOcr("enhanced"));
 previewSelectedBtnEl.addEventListener("click", previewSelectedCandidates);
 convertSelectedBtnEl.addEventListener("click", convertSelectedCandidates);
 

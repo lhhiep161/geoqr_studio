@@ -76,10 +76,13 @@ class OCRCandidateResponse(BaseModel):
 
 class OCRCoordinatesResponse(BaseModel):
     ok: bool = True
+    ocr_mode: str
     raw_text: str
     preprocessing_method: str
     ocr_config: str
     ocr_language: str
+    elapsed_seconds: float
+    candidate_count: int
     candidates: List[OCRCandidateResponse]
     warnings: List[str]
 
@@ -129,7 +132,13 @@ def ocr_status() -> OCRStatusResponse:
 
 
 @app.post("/api/ocr-coordinates", response_model=OCRCoordinatesResponse | OCRErrorResponse)
-async def ocr_coordinates(image: UploadFile = File(...)):
+async def ocr_coordinates(mode: str = "fast", image: UploadFile = File(...)):
+    normalized_mode = mode.strip().lower() if mode else "fast"
+    mode_warning: Optional[str] = None
+    if normalized_mode not in {"fast", "enhanced"}:
+        mode_warning = f"OCR mode '{mode}' không hợp lệ, hệ thống dùng mặc định 'fast'."
+        normalized_mode = "fast"
+
     if image is None:
         err = OCRError(
             stage="upload_read",
@@ -176,9 +185,19 @@ async def ocr_coordinates(image: UploadFile = File(...)):
             status_code=400,
         )
         return JSONResponse(status_code=err.status_code, content=err.to_dict())
+    if len(content) > 5 * 1024 * 1024:
+        err = OCRError(
+            stage="upload_read",
+            error_code="UPLOAD_TOO_LARGE",
+            message="Ảnh vượt quá giới hạn dung lượng 5MB.",
+            detail=f"file_size_bytes={len(content)}",
+            suggestion="Vui lòng crop ảnh nhỏ hơn (<=5MB) rồi thử lại.",
+            status_code=413,
+        )
+        return JSONResponse(status_code=err.status_code, content=err.to_dict())
 
     try:
-        ocr_result = run_ocr_with_diagnostics(content)
+        ocr_result = run_ocr_with_diagnostics(content, mode=normalized_mode)
     except OCRError as err:
         logger.error("OCR error stage=%s code=%s detail=%s", err.stage, err.error_code, err.detail)
         return JSONResponse(status_code=err.status_code, content=err.to_dict())
@@ -198,6 +217,8 @@ async def ocr_coordinates(image: UploadFile = File(...)):
         return JSONResponse(status_code=err.status_code, content=err.to_dict())
 
     warnings: List[str] = []
+    if mode_warning:
+        warnings.append(mode_warning)
     warnings.extend(ocr_result.warnings)
     warnings.extend(parse_warnings)
     if not candidates:
@@ -206,10 +227,13 @@ async def ocr_coordinates(image: UploadFile = File(...)):
 
     return OCRCoordinatesResponse(
         ok=True,
+        ocr_mode=ocr_result.ocr_mode,
         raw_text=ocr_result.raw_text,
         preprocessing_method=ocr_result.preprocessing_method,
         ocr_config=ocr_result.ocr_config,
         ocr_language=ocr_result.language,
+        elapsed_seconds=ocr_result.elapsed_seconds,
+        candidate_count=len(candidates),
         candidates=[
             OCRCandidateResponse(
                 point_label=item.point_label,

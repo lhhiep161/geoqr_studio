@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import statistics
+import time
 from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO
@@ -36,10 +37,12 @@ class OCRStatusInfo:
 
 @dataclass(frozen=True)
 class OCRRunResult:
+    ocr_mode: str
     raw_text: str
     preprocessing_method: str
     ocr_config: str
     language: str
+    elapsed_seconds: float
     warnings: List[str]
 
 
@@ -196,7 +199,7 @@ def extract_coordinate_candidates_with_warnings(raw_text: str) -> Tuple[List[OCR
         return out
 
     raw_rows: List[Tuple[str, str, str]] = []
-    for idx, line in enumerate(lines):
+    for line in lines:
         if "|" in line:
             parts = [p.strip() for p in line.split("|") if p.strip()]
             if len(parts) < 2:
@@ -211,7 +214,6 @@ def extract_coordinate_candidates_with_warnings(raw_text: str) -> Tuple[List[OCR
             raw_rows.append((label, left, right))
             continue
 
-        # Secondary row-based parser for lines without explicit separator.
         coord_tokens = coord_tokens_from_segment(line)
         if len(coord_tokens) < 2:
             continue
@@ -237,7 +239,6 @@ def extract_coordinate_candidates_with_warnings(raw_text: str) -> Tuple[List[OCR
             if v1 is None or v2 is None:
                 continue
 
-            # Range sanity for VN2000-like table rows.
             big_min, big_max = 1_000_000.0, 2_500_000.0
             small_min, small_max = 300_000.0, 800_000.0
             plausible = (
@@ -250,7 +251,7 @@ def extract_coordinate_candidates_with_warnings(raw_text: str) -> Tuple[List[OCR
                 )
                 continue
 
-            corrections = []
+            corrections: List[str] = []
             if corr1:
                 corrections.append(corr1)
             if corr2:
@@ -274,11 +275,9 @@ def extract_coordinate_candidates_with_warnings(raw_text: str) -> Tuple[List[OCR
         if candidates:
             return candidates[:50], warnings
 
-    # If any row-like entries were detected, never run nearby-number fallback.
     if raw_rows:
         return [], warnings
 
-    # Fallback only when no row-like entries were detected at all.
     token_pattern = re.compile(r"(?<!\d)(\d{5,10}(?:[.,]\d+)?)(?!\d)")
     tokens = token_pattern.findall(text)
     values: List[float] = []
@@ -343,7 +342,7 @@ def get_ocr_status() -> OCRStatusInfo:
         return OCRStatusInfo(True, False, "", tesseract_cmd, f"Tesseract unavailable: {exc.__class__.__name__}")
 
 
-def run_ocr_with_diagnostics(image_bytes: bytes) -> OCRRunResult:
+def run_ocr_with_diagnostics(image_bytes: bytes, mode: str = "fast") -> OCRRunResult:
     status = get_ocr_status()
     if not status.python_packages_ok:
         raise OCRError(
@@ -366,8 +365,8 @@ def run_ocr_with_diagnostics(image_bytes: bytes) -> OCRRunResult:
 
     try:
         from PIL import Image, ImageFilter
-        import numpy as np
         import cv2  # type: ignore
+        import numpy as np
         import pytesseract
     except Exception as exc:
         logger.exception("Unexpected dependency import failure during OCR.")
@@ -379,6 +378,9 @@ def run_ocr_with_diagnostics(image_bytes: bytes) -> OCRRunResult:
             suggestion="Reinstall OCR dependencies and restart backend.",
             status_code=503,
         ) from exc
+
+    normalized_mode = mode if mode in {"fast", "enhanced"} else "fast"
+    started = time.perf_counter()
 
     try:
         probe = Image.open(BytesIO(image_bytes))
@@ -408,35 +410,46 @@ def run_ocr_with_diagnostics(image_bytes: bytes) -> OCRRunResult:
         ) from exc
 
     try:
+        max_side = 1800 if normalized_mode == "fast" else 2600
+        width, height = img.size
+        longest = max(width, height)
+        if longest > max_side:
+            scale = max_side / float(longest)
+            img = img.resize((max(1, int(width * scale)), max(1, int(height * scale))), Image.Resampling.LANCZOS)
+
         arr = np.array(img)
-
         gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+
         gray_2x = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-        gray_3x = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-
-        denoise_2x = cv2.fastNlMeansDenoising(gray_2x, None, 10, 7, 21)
-        denoise_3x = cv2.fastNlMeansDenoising(gray_3x, None, 10, 7, 21)
-
-        contrast_2x = cv2.convertScaleAbs(denoise_2x, alpha=1.25, beta=10)
-        contrast_3x = cv2.convertScaleAbs(denoise_3x, alpha=1.30, beta=12)
-
+        denoise_2x = cv2.fastNlMeansDenoising(gray_2x, None, 8, 7, 21)
+        contrast_2x = cv2.convertScaleAbs(denoise_2x, alpha=1.20, beta=8)
         _, otsu_2x = cv2.threshold(contrast_2x, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        adaptive_3x = cv2.adaptiveThreshold(
-            contrast_3x,
-            255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
-            31,
-            7,
-        )
-        sharpen_kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
-        sharp_3x = cv2.filter2D(adaptive_3x, -1, sharpen_kernel)
 
         preprocess_variants = [
-            ("original_rgb", img),
-            ("gray_2x_otsu", Image.fromarray(otsu_2x)),
-            ("gray_3x_adaptive_sharpen", Image.fromarray(sharp_3x).filter(ImageFilter.SHARPEN)),
+            ("fast_gray_2x_otsu", Image.fromarray(otsu_2x)),
+            ("fast_original_rgb", img),
         ]
+
+        if normalized_mode == "enhanced":
+            gray_3x = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+            denoise_3x = cv2.fastNlMeansDenoising(gray_3x, None, 10, 7, 21)
+            contrast_3x = cv2.convertScaleAbs(denoise_3x, alpha=1.30, beta=12)
+            adaptive_3x = cv2.adaptiveThreshold(
+                contrast_3x,
+                255,
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY,
+                31,
+                7,
+            )
+            sharpen_kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+            sharp_3x = cv2.filter2D(adaptive_3x, -1, sharpen_kernel)
+            preprocess_variants.extend(
+                [
+                    ("enhanced_gray_3x_adaptive_sharpen", Image.fromarray(sharp_3x).filter(ImageFilter.SHARPEN)),
+                    ("enhanced_gray_3x_contrast", Image.fromarray(contrast_3x)),
+                ]
+            )
     except Exception as exc:
         logger.exception("Image preprocessing failed for OCR.")
         raise OCRError(
@@ -461,27 +474,42 @@ def run_ocr_with_diagnostics(image_bytes: bytes) -> OCRRunResult:
         ocr_warnings.append("Không kiểm tra được danh sách ngôn ngữ Tesseract, hệ thống dùng eng.")
 
     whitelist = "0123456789.,|/-:;()[]{} XYxyABCDDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠƯàáâãèéêìíòóôõùúăđĩũơưẠ-ỹ"
-    ocr_configs = [
-        ("table_block", f'--oem 3 --psm 6 -c preserve_interword_spaces=1 -c tessedit_char_whitelist="{whitelist}"'),
-        ("line_mode", f'--oem 3 --psm 7 -c preserve_interword_spaces=1 -c tessedit_char_whitelist="{whitelist}"'),
-    ]
+    ocr_configs = [("table_block", f'--oem 3 --psm 6 -c preserve_interword_spaces=1 -c tessedit_char_whitelist="{whitelist}"')]
+    timeout_seconds = 8
+    max_attempts = 2
+    if normalized_mode == "enhanced":
+        ocr_configs.append(("line_mode", f'--oem 3 --psm 7 -c preserve_interword_spaces=1 -c tessedit_char_whitelist="{whitelist}"'))
+        timeout_seconds = 15
+        max_attempts = 6
 
     best_text = ""
     best_method = ""
     best_cfg = ""
     best_score = -1
-    best_candidates: List[OCRCandidate] = []
-    best_parse_warnings: List[str] = []
     run_error: Optional[Exception] = None
+    attempts = 0
 
     for method_name, image_variant in preprocess_variants:
         for cfg_name, cfg_value in ocr_configs:
+            if attempts >= max_attempts:
+                break
+            attempts += 1
             try:
-                text = pytesseract.image_to_string(image_variant, lang=lang_to_use, config=cfg_value) or ""
+                text = pytesseract.image_to_string(
+                    image_variant,
+                    lang=lang_to_use,
+                    config=cfg_value,
+                    timeout=timeout_seconds,
+                ) or ""
             except Exception as exc:
                 if lang_to_use == preferred_lang:
                     try:
-                        text = pytesseract.image_to_string(image_variant, lang="eng", config=cfg_value) or ""
+                        text = pytesseract.image_to_string(
+                            image_variant,
+                            lang="eng",
+                            config=cfg_value,
+                            timeout=timeout_seconds,
+                        ) or ""
                         ocr_warnings.append("eng+vie không khả dụng ở lần chạy OCR này, hệ thống đã fallback sang eng.")
                         lang_to_use = "eng"
                     except Exception as exc2:
@@ -491,47 +519,35 @@ def run_ocr_with_diagnostics(image_bytes: bytes) -> OCRRunResult:
                     run_error = exc
                     continue
 
-            candidates, parse_warnings = extract_coordinate_candidates_with_warnings(text)
+            candidates, _ = extract_coordinate_candidates_with_warnings(text)
             score = len(candidates)
             if score > best_score:
                 best_score = score
                 best_text = text
                 best_method = method_name
                 best_cfg = cfg_name
-                best_candidates = candidates
-                best_parse_warnings = parse_warnings
+        if attempts >= max_attempts:
+            break
 
     if best_score < 0:
         logger.exception("Tesseract OCR execution failed.", exc_info=run_error)
+        is_timeout = isinstance(run_error, RuntimeError)
         raise OCRError(
             stage="tesseract_run",
-            error_code="TESSERACT_RUN_FAILED",
-            message="Tesseract OCR run failed.",
+            error_code="TESSERACT_RUN_TIMEOUT" if is_timeout else "TESSERACT_RUN_FAILED",
+            message="Tesseract OCR timeout." if is_timeout else "Tesseract OCR run failed.",
             detail=f"{(run_error.__class__.__name__ if run_error else 'UnknownError')}: tesseract execution error",
-            suggestion="Chua cau hinh duoc Tesseract OCR. Kiem tra TESSERACT_CMD/PATH.",
-            status_code=503,
+            suggestion="OCR mất quá nhiều thời gian hoặc lỗi khi xử lý ảnh. Hãy crop ảnh nhỏ hơn và thử lại.",
+            status_code=504 if is_timeout else 503,
         ) from run_error
 
-    try:
-        _ = best_text or ""
-        _ = best_candidates
-        _ = best_parse_warnings
-    except Exception as exc:
-        logger.exception("Text extraction stage failed.")
-        raise OCRError(
-            stage="text_extract",
-            error_code="TEXT_EXTRACT_FAILED",
-            message="Failed to read OCR text output.",
-            detail=f"{exc.__class__.__name__}: invalid OCR text output",
-            suggestion="Retry with another image crop.",
-            status_code=500,
-        ) from exc
-
-    merged_warnings = list(ocr_warnings)
+    elapsed_seconds = round(time.perf_counter() - started, 3)
     return OCRRunResult(
+        ocr_mode=normalized_mode,
         raw_text=best_text,
         preprocessing_method=best_method,
         ocr_config=best_cfg,
         language=lang_to_use,
-        warnings=merged_warnings,
+        elapsed_seconds=elapsed_seconds,
+        warnings=list(ocr_warnings),
     )
