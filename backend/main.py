@@ -36,7 +36,11 @@ CONFIG_PATH = ROOT_DIR / "config" / "vn2000_local_crs.csv"
 FRONTEND_DIR = ROOT_DIR / "frontend"
 ASSETS_DIR = ROOT_DIR / "assets"
 
-app = FastAPI(title="VietinBank VN2000 Coordinate Checker API", version="0.1.0")
+app = FastAPI(
+    title="GeoQR Studio API",
+    version="0.1.0",
+    description="Công cụ chuyển đổi tọa độ, OCR tọa độ, định vị bản đồ và tạo QR vị trí.",
+)
 config_loader = VN2000ConfigLoader(CONFIG_PATH)
 logger = logging.getLogger(__name__)
 app.add_middleware(

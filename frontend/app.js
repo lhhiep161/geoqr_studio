@@ -634,7 +634,7 @@ downloadQrBtnEl.addEventListener("click", () => {
   if (!src.startsWith("data:image/png;base64,")) return void (statusTextEl.textContent = "Chưa có ảnh QR để tải.");
   const link = document.createElement("a");
   link.href = src;
-  link.download = "vietinbank-vn2000-google-maps-qr.png";
+  link.download = "geoqr-studio-google-maps-qr.png";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -649,7 +649,7 @@ downloadCsvBtnEl.addEventListener("click", () => {
   if (rows.length === 0) return void (multiResultStatusTextEl.textContent = "Chưa có dòng thành công để tải CSV.");
   const header = "point_label,value1,value2,latitude,longitude,google_maps_url";
   const body = rows.map((r) => `"${String(r.point_label).replaceAll('"', '""')}",${r.value1},${r.value2},${r.latitude},${r.longitude},"${String(r.google_maps_url).replaceAll('"', '""')}"`);
-  downloadTextFile("vietinbank-vn2000-multi-convert.csv", [header, ...body].join("\n"), "text/csv;charset=utf-8;");
+  downloadTextFile("geoqr-studio-multi-convert.csv", [header, ...body].join("\n"), "text/csv;charset=utf-8;");
 });
 
 mapsQrBtnEl.addEventListener("click", createMapsQr);
@@ -665,7 +665,7 @@ mapsQrDownloadBtnEl.addEventListener("click", () => {
   if (!mapsQrState.qrDataUrl.startsWith("data:image/png;base64,")) return;
   const link = document.createElement("a");
   link.href = mapsQrState.qrDataUrl;
-  link.download = "vietinbank-google-maps-qr.png";
+  link.download = "geoqr-studio-google-maps-qr.png";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

@@ -2,11 +2,11 @@
 
 ## 1) Tieu de du an
 
-**VietinBank VN2000 Coordinate Checker**
+**GeoQR Studio**
 
 ## 2) Nguoi dung muc tieu
 
-- Can bo VietinBank, dac biet la `CBQHKH`, can kiem tra toa do tu `GCN QSDD`.
+- Nguoi dung can kiem tra toa do tu `GCN QSDD` hoac tai lieu lien quan.
 - Nhu cau chinh: doi chieu nhanh vi tri toa do tren giay to dat dai voi vi tri thuc te tren ban do.
 
 ## 3) Use case chinh
@@ -28,7 +28,7 @@
 - Tinh khoang cach den diem da chuyen doi.
 - Tao Google Maps URL.
 - Tao ma QR tu URL.
-- Giao dien mobile-first, nhan dien VietinBank.
+- Giao dien mobile-first, nhan dien GeoQR Studio.
 - Khong OCR trong MVP v0.1.
 - Khong database trong MVP v0.1.
 - Khong Google Maps API trong MVP v0.1.
@@ -82,8 +82,8 @@
 - Primary: `#005993`
 - Accent: `#D71249`
 - Light background: `#F4F8FB`
-- Phong cach UI ngan hang VietinBank, chuyen nghiep, ro rang.
-- Neu co file `assets/brand/logo-vietinbank.png` thi su dung logo nay.
+- Phong cach UI chuyen nghiep, ro rang.
+- Neu co file `assets/brand/logo.png` thi su dung logo nay.
 
 ## 10) Luu y an toan/phap ly
 
@@ -109,4 +109,3 @@
 - Frontend lay duoc GPS hien tai neu nguoi dung cho phep.
 - Hien thi duoc khoang cach.
 - Test vuot qua bo du lieu `tests/test_coordinates.csv`.
-

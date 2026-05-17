@@ -1,6 +1,8 @@
-# VietinBank VN2000 Coordinate Checker
+# GeoQR Studio
 
-Mobile-first MVP to convert VN2000 cadastral coordinates to WGS84 lat/lng for internal VietinBank reference workflows.
+Cong cu chuyen doi toa do, OCR toa do, dinh vi ban do va tao QR vi tri.
+
+Tac gia: Hoang Hiep
 
 ## Backend MVP (FastAPI)
 

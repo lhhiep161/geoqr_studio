@@ -2,9 +2,9 @@
 
 ## Project
 
-**Name:** VietinBank VN2000 Coordinate Checker
+**Name:** GeoQR Studio
 
-This repository is for a mobile-first PWA/web app used by VietinBank staff, especially `CBQHKH`, to:
+This repository is for a mobile-first PWA/web app used as a personal coordinate workflow tool to:
 
 1. Convert VN2000 cadastral coordinates printed on Vietnamese land-use certificates (`GCN QSDD`) into WGS84 latitude/longitude.
 2. Compare the converted coordinate with the user's current GPS location.
@@ -82,7 +82,7 @@ tests/
 
 ## UI and Branding
 
-Follow VietinBank identity and keep the interface clean, professional, and banking-appropriate.
+Keep the interface clean, professional, and trustworthy.
 
 - Primary color: `#005993`
 - Accent color: `#D71249`
@@ -92,8 +92,8 @@ Follow VietinBank identity and keep the interface clean, professional, and banki
 
 Branding rules:
 
-- If `assets/brand/logo-vietinbank.png` exists, use it in the header/brand area.
-- If the logo is unavailable, fall back to a text brand header: `VietinBank`.
+- If `assets/brand/logo.png` exists, use it in the header/brand area.
+- If the logo is unavailable, fall back to a text brand header: `GeoQR Studio`.
 - Prefer a calm, trustworthy, mobile-first layout over consumer-style map-heavy UI.
 
 ## UX Rules
@@ -169,7 +169,6 @@ When making changes in this repository:
 
 ## Current Repository Notes
 
-- `assets/brand/logo-vietinbank.png` is present and should be used when branding is implemented.
+- `assets/brand/logo.png` is present and should be used when branding is implemented.
 - `data/reference_excel/` contains reference spreadsheets only.
 - `config/` and `tests/` may be populated as implementation proceeds.
-
