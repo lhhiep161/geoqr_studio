@@ -10,7 +10,7 @@
     />
     <meta name="author" content="Hoàng Hiệp" />
     <link rel="icon" type="image/png" href="../assets/brand/logo.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260517-tools4" />
+    <link rel="stylesheet" href="./styles.css?v=20260517-tools6" />
   </head>
   <body>
     <main class="app app-shell">
@@ -40,21 +40,21 @@
           <span class="feature-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M5 4h2v16H5zM17 4h2v16h-2zM8 8l4-3 4 3-4 3-4-3zm0 8l4-3 4 3-4 3-4-3z"/></svg>
           </span>
-          <strong>Chuyển đổi tọa độ</strong>
+          <strong><span class="feature-title-full">Chuyển đổi tọa độ</span><span class="feature-title-short">Nhập tọa độ</span></strong>
           <small>Nhập thủ công, chuyển WGS84 và mở nhanh Google Maps.</small>
         </button>
         <button class="feature-card" type="button" data-feature="ocr">
           <span class="feature-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM7 8h4v4H7zm6 0h4v2h-4zm0 4h4v2h-4zM7 14h4v2H7z"/></svg>
           </span>
-          <strong>Đọc tọa độ từ hình</strong>
+          <strong><span class="feature-title-full">Đọc tọa độ từ hình</span><span class="feature-title-short">Quét tọa độ</span></strong>
           <small>Tải ảnh, chọn 1 điểm và tạo ngay Google Maps/QR.</small>
         </button>
         <button class="feature-card" type="button" data-feature="qr">
           <span class="feature-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h2v2h-2zm4 0h4v2h-4zm-2 4h2v2h-2zm4 0h2v4h-2zm-6 2h4v2h-4z"/></svg>
           </span>
-          <strong>Tạo QR vị trí</strong>
+          <strong><span class="feature-title-full">Tạo QR vị trí</span><span class="feature-title-short">QR vị trí</span></strong>
           <small>Hỗ trợ link Maps, lat,lng và Plus Code.</small>
         </button>
       </section>
@@ -67,6 +67,10 @@
           <select id="province" class="field-input" required>
             <option value="">Đang tải danh sách tỉnh/thành...</option>
           </select>
+          <div class="field-feedback">
+            <p id="provinceStatusText" class="field-status"></p>
+            <button id="retryProvinceBtn" class="retry-btn hidden" type="button">Thử lại</button>
+          </div>
           <label class="field-label" for="value1">Giá trị tọa độ 1</label>
           <input id="value1" class="field-input" type="number" step="any" placeholder="Ví dụ: 568262.924" required />
           <label class="field-label" for="value2">Giá trị tọa độ 2</label>
@@ -108,6 +112,10 @@
           <select id="ocrProvince" class="field-input" required>
             <option value="">Đang tải danh sách tỉnh/thành...</option>
           </select>
+          <div class="field-feedback">
+            <p id="ocrProvinceStatusText" class="field-status"></p>
+            <button id="retryOcrProvinceBtn" class="retry-btn hidden" type="button">Thử lại</button>
+          </div>
           <div class="upload-actions">
             <button id="captureBtn" class="secondary-btn" type="button">Chụp ảnh vùng tọa độ</button>
             <button id="pickFileBtn" class="secondary-btn" type="button">Chọn ảnh có sẵn</button>

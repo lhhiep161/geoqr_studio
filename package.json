@@ -6,6 +6,7 @@
   "scripts": {
     "build:web": "python scripts/build_web.py",
     "build:web:mobile": "python scripts/build_web.py --require-api-base-url",
+    "icon:generate": "python scripts/generate_app_icons.py",
     "cap:sync": "npx cap sync",
     "cap:sync:android": "npx cap sync android",
     "cap:sync:ios": "npx cap sync ios",

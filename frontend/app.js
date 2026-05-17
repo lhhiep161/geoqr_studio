@@ -4,10 +4,13 @@
 
   const { protocol, hostname, port } = window.location;
   const isCapacitorNative = Boolean(window.Capacitor?.isNativePlatform?.() || window.Capacitor);
+  const mobileBase = window.APP_CONFIG?.MOBILE_API_BASE_URL;
 
   // On native WebView (Capacitor), never fall back to localhost:8000.
-  // Mobile builds should inject a production API URL via config.js.
-  if (isCapacitorNative) return "";
+  // Prefer explicit mobile API base URL to avoid province list load failures.
+  if (isCapacitorNative && typeof mobileBase === "string" && mobileBase.trim() !== "") {
+    return mobileBase.trim().replace(/\/+$/, "");
+  }
 
   // If frontend is served on a non-8000 port (e.g. :5500), target backend on :8000
   // using the same host so both desktop LAN and mobile LAN work without manual config.
@@ -27,11 +30,24 @@ const API_URLS = {
   ocrCoordinates: `${API_BASE_URL}/api/ocr-coordinates`,
   googleMapsQr: `${API_BASE_URL}/api/google-maps-qr`,
 };
+const MOBILE_API_BASE_URL = (window.APP_CONFIG?.MOBILE_API_BASE_URL || "").trim().replace(/\/+$/, "");
+
+function applyApiBaseUrl(nextBase) {
+  const normalized = (nextBase || "").trim().replace(/\/+$/, "");
+  API_URLS.provinces = `${normalized}/api/provinces`;
+  API_URLS.convert = `${normalized}/api/convert`;
+  API_URLS.ocrCoordinates = `${normalized}/api/ocr-coordinates`;
+  API_URLS.googleMapsQr = `${normalized}/api/google-maps-qr`;
+}
 
 const provinceEl = document.getElementById("province");
 const value1El = document.getElementById("value1");
 const value2El = document.getElementById("value2");
 const inputModeEl = document.getElementById("inputMode");
+const provinceStatusTextEl = document.getElementById("provinceStatusText");
+const ocrProvinceStatusTextEl = document.getElementById("ocrProvinceStatusText");
+const retryProvinceBtnEl = document.getElementById("retryProvinceBtn");
+const retryOcrProvinceBtnEl = document.getElementById("retryOcrProvinceBtn");
 const convertBtnEl = document.getElementById("convertBtn");
 const statusTextEl = document.getElementById("statusText");
 const resultCardEl = document.getElementById("resultCard");
@@ -374,15 +390,84 @@ function previewSelectedCandidates() {
 }
 
 async function loadProvinces() {
+  const setProvinceStatus = (message = "", type = "muted", showRetry = false) => {
+    [provinceStatusTextEl, ocrProvinceStatusTextEl].forEach((el) => {
+      if (!el) return;
+      el.textContent = message;
+      el.classList.remove("error", "success");
+      if (type === "error") el.classList.add("error");
+      if (type === "success") el.classList.add("success");
+    });
+    [retryProvinceBtnEl, retryOcrProvinceBtnEl].forEach((btn) => {
+      if (!btn) return;
+      btn.classList.toggle("hidden", !showRetry);
+      btn.disabled = false;
+    });
+  };
+
+  provinceEl.disabled = true;
+  ocrProvinceEl.disabled = true;
   provinceEl.innerHTML = '<option value="">Đang tải danh sách tỉnh/thành...</option>';
   ocrProvinceEl.innerHTML = '<option value="">Đang tải danh sách tỉnh/thành...</option>';
+  setProvinceStatus("Đang tải danh sách tỉnh/thành...", "muted", false);
   try {
-    const resp = await fetch(API_URLS.provinces);
-    if (!resp.ok) throw new Error();
-    const data = await resp.json();
+    const candidateUrls = [API_URLS.provinces];
+    const prodUrl = MOBILE_API_BASE_URL ? `${MOBILE_API_BASE_URL}/api/provinces` : "";
+    if (prodUrl && !candidateUrls.includes(prodUrl)) candidateUrls.push(prodUrl);
+
+    let resp = null;
+    let bodyText = "";
+    let chosenUrl = "";
+    let lastError = null;
+    for (const url of candidateUrls) {
+      try {
+        const currentResp = await fetch(url);
+        const currentBody = await currentResp.text();
+        if (!currentResp.ok) {
+          console.error("[GeoQR] Load provinces failed", {
+            url,
+            status: currentResp.status,
+            body: currentBody?.slice(0, 400),
+          });
+          lastError = new Error(`HTTP_${currentResp.status}`);
+          continue;
+        }
+        resp = currentResp;
+        bodyText = currentBody;
+        chosenUrl = url;
+        break;
+      } catch (err) {
+        lastError = err;
+        console.error("[GeoQR] Load provinces fetch exception", {
+          url,
+          error: err?.message || String(err),
+        });
+      }
+    }
+
+    if (!resp || !chosenUrl) throw lastError || new Error("ALL_PROVINCE_ENDPOINTS_FAILED");
+
+    // If fallback endpoint is selected, switch all API calls to this base.
+    if (MOBILE_API_BASE_URL && chosenUrl.startsWith(`${MOBILE_API_BASE_URL}/api/`)) {
+      applyApiBaseUrl(MOBILE_API_BASE_URL);
+      console.info("[GeoQR] Switched API base URL to production fallback:", MOBILE_API_BASE_URL);
+    }
+
+    let data = {};
+    try {
+      data = bodyText ? JSON.parse(bodyText) : {};
+    } catch (_err) {
+      console.error("[GeoQR] Provinces response is not valid JSON", {
+        url: API_URLS.provinces,
+        body: bodyText?.slice(0, 400),
+      });
+      throw new Error("INVALID_JSON");
+    }
+    const provinceList = Array.isArray(data?.provinces) ? data.provinces : Array.isArray(data) ? data : [];
+    if (provinceList.length === 0) throw new Error("EMPTY_PROVINCE_LIST");
     provinceEl.innerHTML = '<option value="">Chọn tỉnh/thành phố</option>';
     ocrProvinceEl.innerHTML = '<option value="">Chọn tỉnh/thành phố</option>';
-    (data.provinces || []).forEach((province) => {
+    provinceList.forEach((province) => {
       const opt1 = document.createElement("option");
       opt1.value = province;
       opt1.textContent = province;
@@ -399,9 +484,20 @@ async function loadProvinces() {
       provinceEl.value = found;
       ocrProvinceEl.value = found;
     }
-  } catch {
-    provinceEl.innerHTML = '<option value="">Không tải được danh sách tỉnh/thành</option>';
-    ocrProvinceEl.innerHTML = '<option value="">Không tải được danh sách tỉnh/thành</option>';
+    provinceEl.disabled = false;
+    ocrProvinceEl.disabled = false;
+    setProvinceStatus("Đã tải danh sách tỉnh/thành.", "success", false);
+  } catch (err) {
+    console.error("[GeoQR] Cannot load provinces", {
+      url: API_URLS.provinces,
+      apiBaseUrl: API_BASE_URL || "same-origin",
+      error: err?.message || String(err),
+    });
+    provinceEl.innerHTML = '<option value="">Chưa có dữ liệu tỉnh/thành</option>';
+    ocrProvinceEl.innerHTML = '<option value="">Chưa có dữ liệu tỉnh/thành</option>';
+    provinceEl.disabled = true;
+    ocrProvinceEl.disabled = true;
+    setProvinceStatus("Không tải được danh sách tỉnh/thành. Vui lòng kiểm tra kết nối API rồi thử lại.", "error", true);
     statusTextEl.textContent = `Không kết nối được backend (${API_BASE_URL || "same-origin"}).`;
   }
 }
@@ -699,6 +795,8 @@ mapsQrDownloadBtnEl.addEventListener("click", () => {
 featureCardEls.forEach((card) => {
   card.addEventListener("click", () => setActiveFeature(card.dataset.feature));
 });
+retryProvinceBtnEl?.addEventListener("click", loadProvinces);
+retryOcrProvinceBtnEl?.addEventListener("click", loadProvinces);
 
 setActiveFeature(state.activeFeature);
 loadProvinces();

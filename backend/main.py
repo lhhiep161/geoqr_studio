@@ -64,6 +64,7 @@ def _build_allowed_origins() -> List[str]:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_build_allowed_origins(),
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(:\d+)?$",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
