@@ -128,3 +128,66 @@ def test_strict_row_parser_pipe_sample_no_cross_row_pairs() -> None:
         (99913.81, 1203427.01),
     }
     assert wrong_pairs.isdisjoint(set(actual_pairs))
+
+
+def test_row_parser_recovers_missing_decimal_points_from_same_row() -> None:
+    text = """
+    1 120343109 59993266 20.00
+    2 120342880 59991280 4.20
+    3 120342472 59991381 20.00
+    4 120342701 59993367 4.20
+    1 120343109 59993266
+    """
+    candidates = extract_coordinate_candidates_from_text(text)
+    actual = [(round(c.value1, 2), round(c.value2, 2)) for c in candidates]
+    expected = [
+        (1203431.09, 599932.66),
+        (1203428.80, 599912.80),
+        (1203424.72, 599913.81),
+        (1203427.01, 599933.67),
+        (1203431.09, 599932.66),
+    ]
+    assert actual == expected
+    assert any("inferred decimal scale" in corr for item in candidates for corr in item.corrections)
+
+
+def test_pattern_validation_filters_outlier_row() -> None:
+    text = """
+    1 1200033.39 591476.56
+    2 1200022.35 591513.52
+    3 1230002235 591514.25
+    4 1200017.00 591514.06
+    """
+    candidates, warnings = extract_coordinate_candidates_with_warnings(text)
+    actual = [(round(c.value1, 2), round(c.value2, 2)) for c in candidates]
+    expected = [
+        (1200033.39, 591476.56),
+        (1200022.35, 591513.52),
+        (1200017.00, 591514.06),
+    ]
+    assert actual == expected
+    assert any("inconsistent coordinate pattern" in warning for warning in warnings)
+
+
+def test_warns_when_line_has_digits_but_not_enough_coordinate_tokens() -> None:
+    text = """
+    1 1200033.39
+    2 1200022.35 591513.52
+    """
+    candidates, warnings = extract_coordinate_candidates_with_warnings(text)
+    assert len(candidates) == 1
+    assert round(candidates[0].value1, 2) == 1200022.35
+    assert round(candidates[0].value2, 2) == 591513.52
+    assert any("not enough coordinate tokens" in warning for warning in warnings)
+
+
+def test_warns_when_pipe_row_is_missing_one_side() -> None:
+    text = """
+    1200033.39 |
+    1200022.35 | 591513.52
+    """
+    candidates, warnings = extract_coordinate_candidates_with_warnings(text)
+    assert len(candidates) == 1
+    assert round(candidates[0].value1, 2) == 1200022.35
+    assert round(candidates[0].value2, 2) == 591513.52
+    assert any("one side of the pair could not be read" in warning for warning in warnings)

@@ -14,6 +14,24 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+OCR requires the Tesseract system binary in addition to Python packages.
+
+macOS Homebrew:
+
+```bash
+brew install tesseract tesseract-lang
+export TESSERACT_CMD=/opt/homebrew/bin/tesseract
+```
+
+Windows:
+
+1. Install Tesseract OCR for Windows.
+2. Set `TESSERACT_CMD` to the installed executable path, usually:
+
+```text
+C:\Program Files\Tesseract-OCR\tesseract.exe
+```
+
 ### 2) Run API + Frontend
 
 ```bash

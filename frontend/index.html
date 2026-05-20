@@ -119,15 +119,31 @@
           <div class="upload-actions">
             <button id="captureBtn" class="secondary-btn" type="button">Chụp ảnh vùng tọa độ</button>
             <button id="pickFileBtn" class="secondary-btn" type="button">Chọn ảnh có sẵn</button>
-            <input id="ocrImageCaptureInput" class="hidden" type="file" accept="image/*" />
+            <input id="ocrImageCaptureInput" class="hidden" type="file" accept="image/*" capture="environment" />
             <input id="ocrImageInput" class="hidden" type="file" accept="image/*" />
           </div>
           <p id="ocrFileNameText" class="manual-status-text">Chưa chọn ảnh.</p>
-          <div class="ocr-actions">
-            <button id="ocrFastBtn" class="convert-btn" type="button">Đọc nhanh tọa độ</button>
-            <button id="ocrEnhancedBtn" class="secondary-btn" type="button">Đọc kỹ tọa độ</button>
-          </div>
-          <p id="ocrEnhancedNote" class="manual-note hidden">Chế độ đọc kỹ có thể mất nhiều thời gian hơn.</p>
+          <section id="ocrCropPanel" class="ocr-crop-panel hidden" aria-label="Xem trước và khoanh vùng ảnh OCR">
+            <div class="ocr-crop-mode ocr-inline-two" role="radiogroup" aria-label="Chọn vùng OCR">
+              <label><input type="radio" name="ocrCropMode" value="full" checked /> OCR toàn ảnh</label>
+              <label><input type="radio" name="ocrCropMode" value="crop" /> Khoanh vùng tọa độ</label>
+            </div>
+            <p class="manual-note">Kéo khung để chọn đúng vùng có tọa độ X/Y hoặc Lat/Lng.</p>
+            <div id="ocrPreviewWrap" class="ocr-preview-wrap">
+              <img id="ocrPreviewImage" alt="Ảnh dùng cho OCR" />
+              <div id="ocrCropBox" class="ocr-crop-box hidden" aria-hidden="true">
+                <span class="ocr-crop-handle" data-handle="nw"></span>
+                <span class="ocr-crop-handle" data-handle="ne"></span>
+                <span class="ocr-crop-handle" data-handle="sw"></span>
+                <span class="ocr-crop-handle" data-handle="se"></span>
+              </div>
+            </div>
+            <div id="ocrCropActions" class="ocr-actions ocr-inline-two">
+              <button id="useCropBtn" class="secondary-btn" type="button">Dùng vùng này để OCR</button>
+              <button id="ocrReadBtn" class="convert-btn" type="button">Đọc tọa độ</button>
+            </div>
+            <p id="ocrCropStatusText" class="field-status"></p>
+          </section>
           <p id="ocrStatusText" class="manual-status-text"></p>
           <ul id="ocrWarnings" class="ocr-warnings"></ul>
           <div id="ocrCandidatesTableWrap" class="ocr-table-wrap hidden">

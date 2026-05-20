@@ -61,9 +61,15 @@ const ocrProvinceEl = document.getElementById("ocrProvince");
 const ocrImageInputEl = document.getElementById("ocrImageInput");
 const ocrImageCaptureInputEl = document.getElementById("ocrImageCaptureInput");
 const ocrFileNameTextEl = document.getElementById("ocrFileNameText");
-const ocrFastBtnEl = document.getElementById("ocrFastBtn");
-const ocrEnhancedBtnEl = document.getElementById("ocrEnhancedBtn");
-const ocrEnhancedNoteEl = document.getElementById("ocrEnhancedNote");
+const ocrCropPanelEl = document.getElementById("ocrCropPanel");
+const ocrPreviewWrapEl = document.getElementById("ocrPreviewWrap");
+const ocrPreviewImageEl = document.getElementById("ocrPreviewImage");
+const ocrCropBoxEl = document.getElementById("ocrCropBox");
+const ocrCropActionsEl = document.getElementById("ocrCropActions");
+const useCropBtnEl = document.getElementById("useCropBtn");
+const ocrCropStatusTextEl = document.getElementById("ocrCropStatusText");
+const ocrCropModeEls = Array.from(document.querySelectorAll('input[name="ocrCropMode"]'));
+const ocrReadBtnEl = document.getElementById("ocrReadBtn");
 const ocrStatusTextEl = document.getElementById("ocrStatusText");
 const ocrWarningsEl = document.getElementById("ocrWarnings");
 const ocrCandidatesTableWrapEl = document.getElementById("ocrCandidatesTableWrap");
@@ -128,7 +134,18 @@ const openMapsBtnEl = document.getElementById("openMapsBtn");
 const brandLogoEl = document.getElementById("brandLogo");
 const brandFallbackEl = document.getElementById("brandFallback");
 
-const state = { lastLatitude: null, lastLongitude: null, lastMapsUrl: "", activeFeature: "convert", ocrSingle: null };
+const state = {
+  lastLatitude: null,
+  lastLongitude: null,
+  lastMapsUrl: "",
+  activeFeature: "convert",
+  ocrSingle: null,
+  selectedOcrFile: null,
+  ocrObjectUrl: "",
+  ocrCropMode: "full",
+  ocrCropBlob: null,
+  ocrCropRect: { x: 10, y: 20, w: 80, h: 45 },
+};
 const mapsQrState = { link: "", qrDataUrl: "", accuracyMeters: null, vn2000Text: "" };
 
 function toVietnameseCoordinateSource(source) {
@@ -192,19 +209,9 @@ function setLocationStatus(message, type = "muted") {
   if (type === "success") locationStatusTextEl.classList.add("success");
 }
 
-function setOcrLoading(isLoading, mode = "fast") {
-  ocrFastBtnEl.disabled = isLoading;
-  ocrEnhancedBtnEl.disabled = isLoading;
-  if (!isLoading) {
-    ocrFastBtnEl.textContent = "Đọc nhanh tọa độ";
-    ocrEnhancedBtnEl.textContent = "Đọc kỹ tọa độ";
-    return;
-  }
-  if (mode === "enhanced") {
-    ocrEnhancedBtnEl.textContent = "Đang đọc kỹ tọa độ, vui lòng chờ...";
-  } else {
-    ocrFastBtnEl.textContent = "Đang đọc nhanh tọa độ...";
-  }
+function setOcrLoading(isLoading) {
+  ocrReadBtnEl.disabled = isLoading;
+  ocrReadBtnEl.textContent = isLoading ? "Đang đọc tọa độ..." : "Đọc tọa độ";
 }
 
 function setMultiConvertLoading(isLoading) {
@@ -257,14 +264,147 @@ function mapOcrErrorMessage(payload) {
   return payload.message || "OCR thất bại.";
 }
 
+function resetOcrCropOutput() {
+  state.ocrCropBlob = null;
+  if (ocrCropStatusTextEl) ocrCropStatusTextEl.textContent = "";
+}
+
+function renderOcrCropBox() {
+  if (!ocrCropBoxEl) return;
+  const rect = state.ocrCropRect;
+  ocrCropBoxEl.style.left = `${rect.x}%`;
+  ocrCropBoxEl.style.top = `${rect.y}%`;
+  ocrCropBoxEl.style.width = `${rect.w}%`;
+  ocrCropBoxEl.style.height = `${rect.h}%`;
+}
+
+function setOcrCropMode(mode) {
+  state.ocrCropMode = mode === "crop" ? "crop" : "full";
+  const isCrop = state.ocrCropMode === "crop";
+  ocrCropModeEls.forEach((input) => {
+    input.checked = input.value === state.ocrCropMode;
+  });
+  ocrCropBoxEl.classList.toggle("hidden", !isCrop);
+  useCropBtnEl.classList.toggle("hidden", !isCrop);
+  resetOcrCropOutput();
+  renderOcrCropBox();
+}
+
+function setOcrCropStatus(message, type = "muted") {
+  if (!ocrCropStatusTextEl) return;
+  ocrCropStatusTextEl.textContent = message;
+  ocrCropStatusTextEl.classList.remove("error", "success");
+  if (type === "error") ocrCropStatusTextEl.classList.add("error");
+  if (type === "success") ocrCropStatusTextEl.classList.add("success");
+}
+
+function clearOcrPreview() {
+  if (state.ocrObjectUrl) URL.revokeObjectURL(state.ocrObjectUrl);
+  state.ocrObjectUrl = "";
+  state.selectedOcrFile = null;
+  state.ocrCropBlob = null;
+  state.ocrCropRect = { x: 10, y: 20, w: 80, h: 45 };
+  ocrPreviewImageEl.removeAttribute("src");
+  ocrCropPanelEl.classList.add("hidden");
+  setOcrCropMode("full");
+}
+
 function setSelectedFile(file) {
-  ocrFileNameTextEl.textContent = file ? `Ảnh đã chọn: ${file.name}` : "Chưa chọn ảnh.";
+  if (!file) {
+    ocrFileNameTextEl.textContent = "Chưa chọn ảnh.";
+    clearOcrPreview();
+    return;
+  }
+  if (!file.type.startsWith("image/")) {
+    ocrFileNameTextEl.textContent = "File đã chọn không phải ảnh.";
+    clearOcrPreview();
+    return;
+  }
+  if (state.ocrObjectUrl) URL.revokeObjectURL(state.ocrObjectUrl);
+  state.selectedOcrFile = file;
+  state.ocrCropBlob = null;
+  state.ocrCropRect = { x: 10, y: 20, w: 80, h: 45 };
+  state.ocrObjectUrl = URL.createObjectURL(file);
+  ocrPreviewImageEl.src = state.ocrObjectUrl;
+  ocrCropPanelEl.classList.remove("hidden");
+  ocrFileNameTextEl.textContent = `Ảnh đã chọn: ${file.name}`;
+  setOcrCropMode("full");
+  setOcrCropStatus("Có thể OCR toàn ảnh hoặc khoanh vùng tọa độ trước khi đọc.", "muted");
 }
 
 function setActiveFeature(feature) {
   state.activeFeature = feature;
   featureCardEls.forEach((card) => card.classList.toggle("feature-card-active", card.dataset.feature === feature));
   toolPanelEls.forEach((panel) => panel.classList.toggle("active", panel.dataset.panel === feature));
+}
+
+function clampCropRect(rect) {
+  const minSize = 8;
+  let x = Math.max(0, Math.min(100 - minSize, rect.x));
+  let y = Math.max(0, Math.min(100 - minSize, rect.y));
+  let w = Math.max(minSize, Math.min(100 - x, rect.w));
+  let h = Math.max(minSize, Math.min(100 - y, rect.h));
+  if (x + w > 100) x = 100 - w;
+  if (y + h > 100) y = 100 - h;
+  return { x, y, w, h };
+}
+
+function pointerPercentInPreview(event) {
+  const bounds = ocrPreviewImageEl.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) return null;
+  const x = ((event.clientX - bounds.left) / bounds.width) * 100;
+  const y = ((event.clientY - bounds.top) / bounds.height) * 100;
+  return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
+}
+
+async function buildOcrCropBlob() {
+  if (!state.selectedOcrFile) throw new Error("NO_IMAGE");
+  if (!ocrPreviewImageEl.naturalWidth || !ocrPreviewImageEl.naturalHeight) throw new Error("IMAGE_NOT_READY");
+
+  const rect = clampCropRect(state.ocrCropRect);
+  state.ocrCropRect = rect;
+  renderOcrCropBox();
+
+  const sx = Math.round((rect.x / 100) * ocrPreviewImageEl.naturalWidth);
+  const sy = Math.round((rect.y / 100) * ocrPreviewImageEl.naturalHeight);
+  const sw = Math.max(1, Math.round((rect.w / 100) * ocrPreviewImageEl.naturalWidth));
+  const sh = Math.max(1, Math.round((rect.h / 100) * ocrPreviewImageEl.naturalHeight));
+  const longest = Math.max(sw, sh);
+  const scale = Math.max(1, Math.min(2, 1800 / longest));
+  const outW = Math.max(1, Math.round(sw * scale));
+  const outH = Math.max(1, Math.round(sh * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("CANVAS_UNAVAILABLE");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(ocrPreviewImageEl, sx, sy, sw, sh, 0, 0, outW, outH);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return reject(new Error("CROP_FAILED"));
+        resolve(blob);
+      },
+      "image/jpeg",
+      0.9,
+    );
+  });
+}
+
+async function useCurrentCropForOcr() {
+  if (state.ocrCropMode !== "crop") return null;
+  try {
+    const blob = await buildOcrCropBlob();
+    state.ocrCropBlob = blob;
+    setOcrCropStatus(`Đã chọn vùng OCR (${Math.round(blob.size / 1024)} KB).`, "success");
+    return blob;
+  } catch (_err) {
+    setOcrCropStatus("Không tạo được ảnh crop. Vui lòng chọn lại vùng hoặc OCR toàn ảnh.", "error");
+    return null;
+  }
 }
 
 function readRowValue(input) {
@@ -412,6 +552,61 @@ function previewSelectedCandidates() {
   ocrBatchPreviewEl.appendChild(li);
 }
 
+let ocrCropDrag = null;
+
+function startOcrCropDrag(event) {
+  if (state.ocrCropMode !== "crop") return;
+  const point = pointerPercentInPreview(event);
+  if (!point) return;
+  event.preventDefault();
+  ocrCropBoxEl.setPointerCapture?.(event.pointerId);
+  ocrCropDrag = {
+    pointerId: event.pointerId,
+    handle: event.target?.dataset?.handle || "move",
+    startPoint: point,
+    startRect: { ...state.ocrCropRect },
+  };
+}
+
+function moveOcrCropDrag(event) {
+  if (!ocrCropDrag || ocrCropDrag.pointerId !== event.pointerId) return;
+  const point = pointerPercentInPreview(event);
+  if (!point) return;
+  event.preventDefault();
+  const dx = point.x - ocrCropDrag.startPoint.x;
+  const dy = point.y - ocrCropDrag.startPoint.y;
+  const start = ocrCropDrag.startRect;
+  let next = { ...start };
+  if (ocrCropDrag.handle === "move") {
+    next.x = start.x + dx;
+    next.y = start.y + dy;
+  } else {
+    if (ocrCropDrag.handle.includes("w")) {
+      next.x = start.x + dx;
+      next.w = start.w - dx;
+    }
+    if (ocrCropDrag.handle.includes("e")) {
+      next.w = start.w + dx;
+    }
+    if (ocrCropDrag.handle.includes("n")) {
+      next.y = start.y + dy;
+      next.h = start.h - dy;
+    }
+    if (ocrCropDrag.handle.includes("s")) {
+      next.h = start.h + dy;
+    }
+  }
+  state.ocrCropRect = clampCropRect(next);
+  resetOcrCropOutput();
+  renderOcrCropBox();
+}
+
+function endOcrCropDrag(event) {
+  if (!ocrCropDrag || ocrCropDrag.pointerId !== event.pointerId) return;
+  ocrCropBoxEl.releasePointerCapture?.(event.pointerId);
+  ocrCropDrag = null;
+}
+
 async function loadProvinces() {
   const setProvinceStatus = (message = "", type = "muted", showRetry = false) => {
     [provinceStatusTextEl, ocrProvinceStatusTextEl].forEach((el) => {
@@ -536,9 +731,10 @@ async function loadProvinces() {
   }
 }
 
-async function runOcr(mode) {
-  const file = (ocrImageInputEl.files && ocrImageInputEl.files[0]) || (ocrImageCaptureInputEl.files && ocrImageCaptureInputEl.files[0]);
+async function runOcr() {
+  const file = state.selectedOcrFile || (ocrImageInputEl.files && ocrImageInputEl.files[0]) || (ocrImageCaptureInputEl.files && ocrImageCaptureInputEl.files[0]);
   if (!file) return void setOcrStatus("Vui lòng chọn ảnh trước khi OCR.", "error");
+  const mode = state.ocrCropMode === "crop" ? "fast" : "enhanced";
 
   setOcrStatus("");
   renderOcrWarnings([]);
@@ -549,16 +745,24 @@ async function runOcr(mode) {
   ocrMetaDetailsEl.classList.add("hidden");
   ocrRawDetailsEl.classList.add("hidden");
   multiResultCardEl.classList.add("hidden");
-  ocrEnhancedNoteEl.classList.toggle("hidden", mode !== "enhanced");
-  setOcrLoading(true, mode);
+  setOcrLoading(true);
 
   try {
     const form = new FormData();
-    form.append("image", file);
+    let uploadFile = file;
+    let isCropped = false;
+    if (state.ocrCropMode === "crop") {
+      uploadFile = state.ocrCropBlob || (await useCurrentCropForOcr());
+      if (!uploadFile) return;
+      isCropped = true;
+    }
+    const uploadName = isCropped ? "geoqr-ocr-crop.jpg" : file.name;
+    form.append("image", uploadFile, uploadName);
+    form.append("is_cropped", isCropped ? "true" : "false");
     const url = `${API_URLS.ocrCoordinates}?mode=${encodeURIComponent(mode)}`;
     console.log("[OCR] API_BASE_URL =", API_BASE_URL);
     console.log("[OCR] OCR upload URL =", url);
-    console.log("[OCR] file =", { name: file.name, size: file.size, type: file.type });
+    console.log("[OCR] file =", { name: uploadName, size: uploadFile.size, type: uploadFile.type, isCropped });
 
     const resp = await fetch(url, { method: "POST", body: form });
     const rawBody = await resp.text();
@@ -946,11 +1150,28 @@ async function convertSelectedCandidates() {
 
 captureBtnEl.addEventListener("click", () => ocrImageCaptureInputEl.click());
 pickFileBtnEl.addEventListener("click", () => ocrImageInputEl.click());
-ocrImageCaptureInputEl.addEventListener("change", () => setSelectedFile(ocrImageCaptureInputEl.files?.[0] || null));
-ocrImageInputEl.addEventListener("change", () => setSelectedFile(ocrImageInputEl.files?.[0] || null));
+ocrImageCaptureInputEl.addEventListener("change", () => {
+  ocrImageInputEl.value = "";
+  setSelectedFile(ocrImageCaptureInputEl.files?.[0] || null);
+});
+ocrImageInputEl.addEventListener("change", () => {
+  ocrImageCaptureInputEl.value = "";
+  setSelectedFile(ocrImageInputEl.files?.[0] || null);
+});
+ocrPreviewImageEl.addEventListener("load", () => {
+  state.ocrCropRect = { x: 10, y: 20, w: 80, h: 45 };
+  renderOcrCropBox();
+});
+ocrCropModeEls.forEach((input) => {
+  input.addEventListener("change", () => setOcrCropMode(input.value));
+});
+ocrCropBoxEl.addEventListener("pointerdown", startOcrCropDrag);
+ocrCropBoxEl.addEventListener("pointermove", moveOcrCropDrag);
+ocrCropBoxEl.addEventListener("pointerup", endOcrCropDrag);
+ocrCropBoxEl.addEventListener("pointercancel", endOcrCropDrag);
+useCropBtnEl.addEventListener("click", useCurrentCropForOcr);
 convertBtnEl.addEventListener("click", convertCoordinates);
-ocrFastBtnEl.addEventListener("click", () => runOcr("fast"));
-ocrEnhancedBtnEl.addEventListener("click", () => runOcr("enhanced"));
+ocrReadBtnEl.addEventListener("click", runOcr);
 previewSelectedBtnEl.addEventListener("click", previewSelectedCandidates);
 convertSelectedBtnEl.addEventListener("click", convertSelectedCandidates);
 

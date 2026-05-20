@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import List, Literal, Optional
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -194,7 +194,7 @@ def ocr_status() -> OCRStatusResponse:
 
 
 @app.post("/api/ocr-coordinates", response_model=OCRCoordinatesResponse | OCRErrorResponse)
-async def ocr_coordinates(mode: str = "fast", image: UploadFile = File(...)):
+async def ocr_coordinates(mode: str = "fast", is_cropped: bool = Form(False), image: UploadFile = File(...)):
     normalized_mode = mode.strip().lower() if mode else "fast"
     mode_warning: Optional[str] = None
     if normalized_mode not in {"fast", "enhanced"}:
@@ -259,7 +259,7 @@ async def ocr_coordinates(mode: str = "fast", image: UploadFile = File(...)):
         return JSONResponse(status_code=err.status_code, content=err.to_dict())
 
     try:
-        ocr_result = run_ocr_with_diagnostics(content, mode=normalized_mode)
+        ocr_result = run_ocr_with_diagnostics(content, mode=normalized_mode, is_cropped=is_cropped)
     except OCRError as err:
         logger.error("OCR error stage=%s code=%s detail=%s", err.stage, err.error_code, err.detail)
         return JSONResponse(status_code=err.status_code, content=err.to_dict())
