@@ -1,2 +1,9 @@
+[project]
+name = "geoqr-studio"
+version = "1.0.0"
+description = "GeoQR Studio FastAPI backend"
+requires-python = ">=3.12"
+dependencies = []
+
 [tool.vercel]
 entrypoint = "backend.main:app"
