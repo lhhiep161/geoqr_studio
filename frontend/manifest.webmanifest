@@ -1,0 +1,33 @@
+{
+  "id": "./",
+  "name": "GeoQR Studio",
+  "short_name": "GeoQR",
+  "description": "Công cụ chuyển đổi tọa độ VN2000, định vị và tạo QR Google Maps.",
+  "lang": "vi",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F4F8FB",
+  "theme_color": "#005993",
+  "icons": [
+    {
+      "src": "../assets/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -133,6 +133,75 @@ const openMapsBtnEl = document.getElementById("openMapsBtn");
 
 const brandLogoEl = document.getElementById("brandLogo");
 const brandFallbackEl = document.getElementById("brandFallback");
+const installAppCardEl = document.getElementById("installAppCard");
+const installAppHelpEl = document.getElementById("installAppHelp");
+const installAppBtnEl = document.getElementById("installAppBtn");
+const dismissInstallBtnEl = document.getElementById("dismissInstallBtn");
+
+let deferredInstallPrompt = null;
+
+function isInstalledPwa() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function isIosDevice() {
+  return /iphone|ipad|ipod/i.test(window.navigator.userAgent)
+    || (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+}
+
+function showInstallCard(mode) {
+  if (!installAppCardEl || isInstalledPwa()) return;
+  installAppCardEl.dataset.installMode = mode;
+  if (mode === "ios") {
+    installAppHelpEl.textContent = "Trong Safari, nhấn Chia sẻ rồi chọn “Thêm vào Màn hình chính”.";
+    installAppBtnEl.textContent = "Đã hiểu";
+  } else {
+    installAppHelpEl.textContent = "Mở nhanh từ màn hình chính như một ứng dụng.";
+    installAppBtnEl.textContent = "Cài ứng dụng";
+  }
+  installAppCardEl.classList.remove("hidden");
+}
+
+function hideInstallCard() {
+  installAppCardEl?.classList.add("hidden");
+}
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  showInstallCard("prompt");
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  hideInstallCard();
+});
+
+installAppBtnEl?.addEventListener("click", async () => {
+  if (installAppCardEl?.dataset.installMode === "ios") {
+    hideInstallCard();
+    return;
+  }
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  hideInstallCard();
+});
+
+dismissInstallBtnEl?.addEventListener("click", hideInstallCard);
+
+if (isIosDevice() && !isInstalledPwa()) {
+  showInstallCard("ios");
+}
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {
+      // Installation remains optional; core web features continue to work.
+    });
+  });
+}
 
 const state = {
   lastLatitude: null,

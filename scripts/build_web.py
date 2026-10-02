@@ -44,6 +44,8 @@ def build_runtime_config(require_api_base_url: bool = False) -> None:
 def copy_static_files() -> None:
     shutil.copy2(FRONTEND_DIR / "app.js", DIST_WEB_DIR / "app.js")
     shutil.copy2(FRONTEND_DIR / "styles.css", DIST_WEB_DIR / "styles.css")
+    shutil.copy2(FRONTEND_DIR / "manifest.webmanifest", DIST_WEB_DIR / "manifest.webmanifest")
+    shutil.copy2(FRONTEND_DIR / "service-worker.js", DIST_WEB_DIR / "service-worker.js")
     shutil.copytree(ASSETS_DIR, DIST_WEB_DIR / "assets", dirs_exist_ok=True)
 
 

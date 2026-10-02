@@ -157,3 +157,17 @@ Notes:
 - Android build/open requires Android Studio + Android SDK.
 - iOS build/open requires macOS + Xcode.
 - Backend CORS can be configured using `CORS_ALLOW_ORIGINS` (comma-separated).
+
+## Cài web app lên màn hình điện thoại (PWA)
+
+PWA cần được mở bằng địa chỉ HTTPS đã triển khai. Các tính năng gọi API như chuyển đổi và OCR vẫn cần kết nối mạng.
+
+- Android/Chrome: mở GeoQR Studio, chọn **Cài ứng dụng** trên thông báo trong trang hoặc chọn **Cài đặt ứng dụng** trong menu Chrome.
+- iPhone/iPad: mở GeoQR Studio bằng Safari, nhấn **Chia sẻ**, rồi chọn **Thêm vào Màn hình chính**.
+- Sau khi cài, GeoQR Studio mở ở chế độ độc lập và có biểu tượng riêng trên màn hình chính.
+
+Kiểm tra bản build PWA/Capacitor:
+
+```bash
+npm run build:web
+```

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -9,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LOGO_PATH = ROOT / "assets" / "brand" / "logo.png"
 ANDROID_RES = ROOT / "android" / "app" / "src" / "main" / "res"
 IOS_ICON_PATH = ROOT / "ios" / "App" / "App" / "Assets.xcassets" / "AppIcon.appiconset" / "AppIcon-512@2x.png"
+PWA_ICON_DIR = ROOT / "assets" / "pwa"
 
 
 ANDROID_ICON_SIZES = {
@@ -58,11 +60,24 @@ def generate_ios_icon(logo: Image.Image) -> None:
     build_square_icon(logo, 1024, inset_ratio=0.84).save(IOS_ICON_PATH)
 
 
+def generate_pwa_icons(logo: Image.Image) -> None:
+    PWA_ICON_DIR.mkdir(parents=True, exist_ok=True)
+    build_square_icon(logo, 192, inset_ratio=0.84).convert("RGB").save(PWA_ICON_DIR / "icon-192.png")
+    build_square_icon(logo, 512, inset_ratio=0.84).convert("RGB").save(PWA_ICON_DIR / "icon-512.png")
+    build_square_icon(logo, 512, inset_ratio=0.70).convert("RGB").save(PWA_ICON_DIR / "icon-maskable-512.png")
+    build_square_icon(logo, 180, inset_ratio=0.84).convert("RGB").save(PWA_ICON_DIR / "apple-touch-icon.png")
+
+
 def main() -> None:
     logo = ensure_logo()
+    if "--pwa-only" in sys.argv[1:]:
+        generate_pwa_icons(logo)
+        print("Generated PWA launcher icons from assets/brand/logo.png")
+        return
     generate_android_icons(logo)
     generate_ios_icon(logo)
-    print("Generated Android/iOS launcher icons from assets/brand/logo.png")
+    generate_pwa_icons(logo)
+    print("Generated Android/iOS/PWA launcher icons from assets/brand/logo.png")
 
 
 if __name__ == "__main__":

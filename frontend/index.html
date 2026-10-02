@@ -9,8 +9,15 @@
       content="Công cụ chuyển đổi tọa độ, OCR tọa độ, định vị bản đồ và tạo QR vị trí"
     />
     <meta name="author" content="Hoàng Hiệp" />
+    <meta name="theme-color" content="#005993" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="GeoQR Studio" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="../assets/pwa/apple-touch-icon.png" />
     <link rel="icon" type="image/png" href="../assets/brand/logo.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260517-tools7" />
+    <link rel="stylesheet" href="./styles.css?v=20261002-pwa1" />
   </head>
   <body>
     <main class="app app-shell">
@@ -34,6 +41,15 @@
           </div>
         </div>
       </header>
+
+      <section id="installAppCard" class="install-app-card hidden" aria-live="polite">
+        <div class="install-app-copy">
+          <strong>Cài GeoQR Studio lên điện thoại</strong>
+          <p id="installAppHelp">Mở nhanh từ màn hình chính như một ứng dụng.</p>
+        </div>
+        <button id="installAppBtn" class="install-app-btn" type="button">Cài ứng dụng</button>
+        <button id="dismissInstallBtn" class="install-app-dismiss" type="button" aria-label="Đóng hướng dẫn cài đặt">×</button>
+      </section>
 
       <section class="feature-grid" aria-label="Chọn chức năng">
         <button class="feature-card feature-card-active" type="button" data-feature="convert">
@@ -227,7 +243,7 @@
       </section>
     </main>
 
-    <script src="./config.js?v=20260519-vn2000-qr"></script>
-    <script src="./app.js?v=20260519-vn2000-qr"></script>
+    <script src="./config.js?v=20261002-pwa1"></script>
+    <script src="./app.js?v=20261002-pwa1"></script>
   </body>
 </html>

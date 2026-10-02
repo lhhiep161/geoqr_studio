@@ -44,3 +44,4 @@ temp/
 *.jpeg
 *.png
 !assets/brand/*.png
+!assets/pwa/*.png

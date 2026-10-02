@@ -51,6 +51,79 @@ body {
   margin-bottom: 6px;
 }
 
+.install-app-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 38px 11px 12px;
+  border: 1px solid rgba(0, 89, 147, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ffffff, #edf8ff);
+  box-shadow: var(--shadow-card);
+}
+
+.install-app-copy {
+  min-width: 0;
+}
+
+.install-app-copy strong {
+  display: block;
+  color: var(--color-primary);
+  font-size: 0.86rem;
+}
+
+.install-app-copy p {
+  margin: 3px 0 0;
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.install-app-btn {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: var(--color-white);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.install-app-btn:hover {
+  background: #004a7b;
+}
+
+.install-app-dismiss {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (max-width: 380px) {
+  .install-app-card {
+    grid-template-columns: 1fr;
+  }
+
+  .install-app-btn {
+    width: 100%;
+  }
+}
+
 .brand-fallback {
   display: none;
   font-weight: 800;
